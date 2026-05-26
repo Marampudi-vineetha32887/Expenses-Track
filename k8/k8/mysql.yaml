@@ -1,0 +1,87 @@
+# Secret + PVC + MySQL Deployment + Service
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mysql-credentials
+  namespace: expenses
+type: Opaque
+stringData:
+  MYSQL_DATABASE: expenses_tracker
+  MYSQL_USER: springstudent
+  MYSQL_PASSWORD: springstudent
+  MYSQL_ROOT_PASSWORD: rootpassword123
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mysql-pvc
+  namespace: expenses
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: expenses-mysql
+  namespace: expenses
+spec:
+  selector:
+    matchLabels:
+      app: expenses-mysql
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: expenses-mysql
+    spec:
+      containers:
+      - name: mysql
+        image: mysql:8.0
+        ports:
+        - containerPort: 3306
+        env:
+        - name: MYSQL_DATABASE
+          valueFrom:
+            secretKeyRef:
+              name: mysql-credentials
+              key: MYSQL_DATABASE
+        - name: MYSQL_USER
+          valueFrom:
+            secretKeyRef:
+              name: mysql-credentials
+              key: MYSQL_USER
+        - name: MYSQL_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: mysql-credentials
+              key: MYSQL_PASSWORD
+        - name: MYSQL_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: mysql-credentials
+              key: MYSQL_ROOT_PASSWORD
+        volumeMounts:
+        - name: mysql-data
+          mountPath: /var/lib/mysql
+      volumes:
+      - name: mysql-data
+        persistentVolumeClaim:
+          claimName: mysql-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: expenses-mysql
+  namespace: expenses
+spec:
+  selector:
+    app: expenses-mysql
+  ports:
+    - protocol: TCP
+      port: 3306
+      targetPort: 3306
+  type: ClusterIP
